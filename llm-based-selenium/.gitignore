@@ -1,0 +1,4 @@
+browser-recording*.json
+enriched-*.json
+page-objects-for-enriched-*.json
+full-test-case-enriched-browser-recording

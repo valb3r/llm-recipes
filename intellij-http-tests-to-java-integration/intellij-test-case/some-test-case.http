@@ -1,0 +1,62 @@
+### 01. Create consent
+POST http://localhost:8299/open-banking/v2/consents/account-access
+accept: application/json
+X-Request-ID: {{$uuid}}
+X-Tpp-Login: TestTPP
+TPP-Redirect-URI: https://google.com?q=hello
+PSU-IP-Address: 1.1.1.1
+X-ASPSP-API-PROFILE-ID: dacadaca-daca-daca-daca-dacadacadaca
+Client-Signature-Certificate: DUMMY
+Content-Type: application/json
+
+{
+  "access": {
+  },
+  "consentType": "global",
+  "recurringIndicator": false,
+  "validTo": "2035-01-09",
+  "frequencyPerDay": 4
+}
+
+> {%
+    client.assert(response.status === 201, "Response status is not 201");
+    client.assert(response.headers.valueOf('Location') != undefined);
+    client.assert(response.body.consentId != undefined);
+    client.assert(response.body.consentStatus == "received");
+    client.assert(response.body._links.self.href != undefined);
+    client.assert(response.body._links.status.href != undefined);
+    client.global.set("consent_id", response.body.consentId);
+%}
+
+### 02. Create authorization
+POST http://localhost:8299/open-banking/v2/consents/{{consent_id}}/authorisations
+accept: application/json
+X-Request-ID: {{$uuid}}
+PSU-ID: lesia.ukrainka
+Client-Signature-Certificate: DUMMY
+Content-Type: application/json
+
+> {%
+    client.assert(response.status === 201, "Response status is not 201");
+    client.assert(response.headers.valueOf('ASPSP-SCA-Approach') == "DECOUPLED");
+    client.assert(response.headers.valueOf('Location') == undefined); // Surprisingly no Location header
+    client.assert(response.body.scaStatus == "scaMethodSelected"); // This is the first status that gets assigned to the authorisation resource if only a single SCA method is available and is selected implicitly.
+    client.global.set("authorisation_id", response.body.authorisationId);
+    client.assert(response.body._links.scaStatus.href != undefined, "ScaStatus link should be absent");
+    client.assert(response.body._links.scaRedirect == undefined, "Redirect link should be absent");
+    client.assert(response.body.scaMethods == undefined, " No sca methods to be displayed");
+%}
+
+### 03. Login
+POST http://localhost:8299/sandbox/v1/resources/online-banking/login
+Content-Type: application/json
+
+{
+  "username": "lesia.ukrainka",
+  "password": "12345"
+}
+
+> {%
+    client.assert(response.status === 200, "Response status is not 200");
+    client.global.set("tokenCookie", response.headers.valueOf("Set-Cookie"));
+%}
